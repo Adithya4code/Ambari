@@ -1,105 +1,78 @@
+// src/screens/WelcomeScreen.tsx
 import React from 'react';
-import { View, Text, StyleSheet, ImageBackground } from 'react-native';
-import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, View, Text, StyleSheet, Image } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';
+import Logo from '../components/Logo';
 import PrimaryButton from '../components/PrimaryButton';
-import SecondaryButton from '../components/SecondaryButton';
+import { Colors, Typography } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Welcome'>;
 
 const WelcomeScreen: React.FC<Props> = ({ navigation }) => {
-  const insets = useSafeAreaInsets();
-
   return (
-    <SafeAreaProvider>
-      <ImageBackground
-        source={require('../../assets/hero_placeholder.png')}
-        style={styles.background}
-        resizeMode="cover"
-      >
-        <View style={styles.overlay}>
-          <Text
-            style={[
-              styles.title,
-              {
-                marginTop: insets.top + 25, // Respect top safe area
-              },
-            ]}
-          >
-            Ambari
-          </Text>
-          <View
-            style={[
-              styles.bottomContent,
-              {
-                paddingBottom: insets.bottom + 24, // Respect bottom safe area
-              },
-            ]}
-          >
-            <Text style={styles.subtitle}>
-              Discover Mysuru’s heritage. Scan QR plaques, collect stamps, and unlock short cultural videos.
-            </Text>
-            <PrimaryButton
-              title="Get Started"
-              onPress={() => navigation.replace('Home')}
-              style={styles.primaryButton}
-            />
-            <SecondaryButton
-              title="Sign in (demo)"
-              onPress={() => navigation.navigate('Home')}
-              style={styles.secondaryButton}
-            />
-          </View>
-        </View>
-      </ImageBackground>
-    </SafeAreaProvider>
+    // SafeAreaView is handled by SafeAreaProvider at top-level; we can still use full-screen container here
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <Logo size={110} />
+        {/* App title */}
+        <Text style={styles.title}>Mysuru Explorer</Text>
+      </View>
+
+      <View style={styles.body}>
+        <Text style={styles.lead}>
+          Discover Mysuru’s rich heritage. Scan QR plaques at real locations, collect beautifully designed stamps, and enjoy short cultural videos — all available offline.
+        </Text>
+
+        <PrimaryButton
+          title="Get Started"
+          onPress={() => {
+            navigation.replace('Home'); // demo flow
+          }}
+          style={{ marginTop: 18, width: '78%' }}
+        />
+      </View>
+
+      {/* Hero background image — uses the hero you uploaded; it's pinned to bottom and spans width */}
+      <Image source={require('../../assets/hero_placeholder.png')} style={styles.hero} resizeMode="cover" />
+    </SafeAreaView>
   );
 };
 
 export default WelcomeScreen;
 
 const styles = StyleSheet.create({
-  background: {
+  container: {
     flex: 1,
-    width: '100%',
-    height: '100%',
-  },
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(255, 248, 243, 0.17)', // Semi-transparent warmWhite for readability
-    justifyContent: 'space-between',
+    backgroundColor: Colors.warmWhite, // subtle warm background to match heritage palette
     alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  header: {
+    alignItems: 'center',
+    marginTop: 18,
   },
   title: {
-    position: 'absolute',
-    top: 0,
-    width: '100%',
-    fontSize: 54,
-    fontWeight: '700',
-    color: '#fcfcfcff', // heritageBrown
-    textAlign: 'center',
+    marginTop: 8,
+    fontSize: 26,
+    fontFamily: Typography.fontFamilyBold,
+    color: Colors.heritageBrown,
   },
-  bottomContent: {
-    position: 'absolute',
-    bottom: 0,
-    width: '100%',
+  body: {
+    paddingHorizontal: 28,
     alignItems: 'center',
-    paddingHorizontal: 24,
   },
-  subtitle: {
-    fontSize: 30,
-    color: '#2d1c1cff',
+  lead: {
     textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 18,
-    fontWeight: '900',
+    fontSize: 15,
+    color: Colors.mutedText,
+    fontFamily: Typography.fontFamily,
+    lineHeight: 22,
   },
-  primaryButton: {
-    width: '80%',
-    marginBottom: 12,
-  },
-  secondaryButton: {
-    width: '80%',
+  hero: {
+    width: '100%',
+    height: 260,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
   },
 });

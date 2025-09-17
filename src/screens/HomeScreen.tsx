@@ -1,64 +1,97 @@
 // src/screens/HomeScreen.tsx
 import React from 'react';
-import { View, Text, StyleSheet, Pressable, FlatList, Image } from 'react-native';
+import { SafeAreaView, View, Text, StyleSheet, FlatList, ImageBackground, Pressable } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import StampCard from '../components/StampCard';
+import { Colors, Typography, Spacing } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
-const demo = [
-  { id: '1', name: 'Chamundi Hill', collected: true, img: require('../../assets/hero_placeholder.png') },
-  { id: '2', name: 'Mysore Palace', collected: false, img: require('../../assets/hero_placeholder.png') },
+const demoData = [
+  { id: 'l1', title: 'Chamundi Hill', collected: true, image: require('../../assets/hero_placeholder.png') },
+  { id: 'l2', title: 'Mysore Palace', collected: true, image: require('../../assets/hero_placeholder.png') },
+  { id: 'l3', title: 'St. Philomena Church', collected: false, image: require('../../assets/hero_placeholder.png') },
+  { id: 'l4', title: 'Jaganmohan Palace', collected: false, image: require('../../assets/hero_placeholder.png') },
 ];
 
 const HomeScreen: React.FC<Props> = ({ navigation }) => {
   return (
-    <SafeAreaProvider style={styles.container}>
-      <View style={styles.headerRow}>
-        <Text style={styles.header}>Your Stamp Book</Text>
-        <Pressable onPress={() => navigation.navigate('Scan')}>
-          <Text style={styles.scan}>Scan</Text>
-        </Pressable>
-      </View>
+    <SafeAreaView style={styles.container}>
+      {/* Hero background at top - ImageBackground lets us overlay content on top of the hero image */}
+      <ImageBackground source={require('../../assets/hero_placeholder.png')} style={styles.heroBg} imageStyle={{ opacity: 0.85 }}>
+        <View style={styles.heroContent}>
+          <Text style={styles.heroTitle}>Your Stamp Book</Text>
+          <Text style={styles.heroSub}>Explore sites and collect unique stamps</Text>
+          <Pressable style={styles.scanButton} onPress={() => navigation.navigate('Scan')}>
+            <Text style={styles.scanText}>Scan QR</Text>
+          </Pressable>
+        </View>
+      </ImageBackground>
 
+      {/* Grid of stamps */}
       <FlatList
-        data={demo}
+        data={demoData}
         keyExtractor={(i) => i.id}
         numColumns={2}
-        contentContainerStyle={{ padding: 12 }}
+        contentContainerStyle={styles.listContent}
         renderItem={({ item }) => (
-          <View style={styles.card}>
-            <Image source={item.img} style={styles.img} />
-            <Text style={styles.cardTitle}>{item.name}</Text>
-            <Text style={item.collected ? styles.collected : styles.locked}>
-              {item.collected ? 'Collected' : 'Locked'}
-            </Text>
-          </View>
+          <StampCard
+            id={item.id}
+            title={item.title}
+            collected={item.collected}
+            image={item.image}
+            onPress={() => {
+              // placeholder - later: navigate to StampDetail
+              console.log('pressed', item.id);
+            }}
+          />
         )}
       />
-    </SafeAreaProvider>
+    </SafeAreaView>
   );
 };
 
 export default HomeScreen;
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FFF8F3' },
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16 },
-  header: { fontSize: 20, fontWeight: '700', color: '#8B4513' },
-  scan: { color: '#C65D3B', fontWeight: '700' },
-  card: {
-    flex: 1,
-    margin: 8,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 10,
-    alignItems: 'center',
-    elevation: 2,
+  container: { flex: 1, backgroundColor: Colors.warmWhite },
+  heroBg: {
+    width: '100%',
+    height: 160,
+    justifyContent: 'center',
   },
-  img: { width: 120, height: 80, borderRadius: 8 },
-  cardTitle: { marginTop: 8, fontWeight: '600' },
-  collected: { marginTop: 6, color: '#2E4F9A', fontWeight: '700' },
-  locked: { marginTop: 6, color: '#bbb' },
+  heroContent: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
+    backgroundColor: 'rgba(255,255,255,0.08)', // subtle overlay to ensure text legibility
+  },
+  heroTitle: {
+    fontFamily: Typography.fontFamilyBold,
+    fontSize: 22,
+    color: '#fff', // hero overlay expects white contrast
+    marginBottom: 6,
+  },
+  heroSub: {
+    fontFamily: Typography.fontFamily,
+    color: '#fff',
+    opacity: 0.9,
+    marginBottom: 12,
+  },
+  scanButton: {
+    alignSelf: 'flex-start',
+    backgroundColor: Colors.gold,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+  },
+  scanText: {
+    fontFamily: Typography.fontFamilySemi,
+    color: Colors.heritageBrown,
+    fontWeight: '700',
+  },
+  listContent: {
+    padding: Spacing.sm,
+    paddingBottom: 100,
+  },
 });
