@@ -1,138 +1,141 @@
+// src/screens/QRScanScreen.tsx
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, Platform } from 'react-native';
-import { CameraView, useCameraPermissions } from 'expo-camera';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';
 import { Colors } from '../theme';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { validateScanData, Location } from '../lib/locations';
+import { addCollectedStamp, enqueueCheckin, hasStamp } from '../lib/storage';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Scan'>;
 
-/**
- * QRScanScreen implemented with expo-camera.
- * CameraView component provides `onBarCodeScanned` callback.
- * We also show permission state handling and a simple frame overlay.
- */
 const QRScanScreen: React.FC<Props> = ({ navigation }) => {
-  const [permission, requestPermission] = useCameraPermissions();
-  const [scanned, setScanned] = useState(false);
-  const cameraRef = useRef<CameraView | null>(null);
-  const insets = useSafeAreaInsets();
+    const [permission, requestPermission] = useCameraPermissions();
+    const cameraRef = useRef<CameraView | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [status, setStatus] = useState<'scanning' | 'processing'>('scanning');
 
-  // Reset scanned state when screen is focused
-  useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', () => {
-      setScanned(false);
-    });
-    return unsubscribe;
-  }, [navigation]);
+    const handleSuccessfulScan = (location: Location) => {
+        navigation.replace('CheckInSuccess', { location_id: location.id, token: location.token });
+    };
 
-  const handleBarCodeScanned = ({ type, data }: { type: string; data: string }) => {
-    if (scanned) return; // avoid duplicate scans
-    setScanned(true);
+    const onBarcodeScanned = async (scanningResult: BarcodeScanningResult) => {
+        if (status === 'processing') return;
+        setStatus('processing');
 
-    // try to parse as URL query params (our QR format)
-    try {
-      const url = new URL(data);
-      const location_id = url.searchParams.get('location_id');
-      const token = url.searchParams.get('token');
-      navigation.replace('CheckInSuccess', { location_id: location_id ?? undefined, token: token ?? undefined });
-    } catch (err) {
-      // fallback: not a URL - send raw data
-      navigation.replace('CheckInSuccess', { location_id: data, token: undefined });
+        const rawData = scanningResult.data;
+
+        try {
+            const validationResult = validateScanData(rawData);
+
+            if (!validationResult.ok) {
+                setError(validationResult.reason);
+                setTimeout(() => {
+                    setError(null);
+                    setStatus('scanning');
+                }, 3000);
+                return;
+            }
+
+            const location = validationResult.location!;
+            const hadStamp = await hasStamp(location.id);
+            await addCollectedStamp(location.id);
+            await enqueueCheckin(location.id, location.token);
+
+            handleSuccessfulScan(location);
+        } catch (err) {
+            console.error('Scan processing error:', err);
+            setError('An error occurred. Please try again.');
+            setTimeout(() => {
+                setError(null);
+                setStatus('scanning');
+            }, 3000);
+        }
+    };
+    
+    // All return statements for rendering must be at the top level
+    if (!permission) {
+        return (
+            <View style={styles.center}>
+                <Text>Requesting camera permissions…</Text>
+            </View>
+        );
     }
-  };
 
-  if (!permission) {
+    if (!permission.granted) {
+        return (
+            <View style={styles.center}>
+                <Text>No camera permission. Please enable camera in settings.</Text>
+                <Pressable onPress={requestPermission} style={{ marginTop: 12 }}>
+                    <Text style={{ color: Colors.terracotta }}>Grant permission</Text>
+                </Pressable>
+                <Pressable onPress={() => navigation.goBack()} style={{ marginTop: 12 }}>
+                    <Text style={{ color: Colors.terracotta }}>Go back</Text>
+                </Pressable>
+            </View>
+        );
+    }
+
     return (
-      <View style={styles.center}>
-        <Text>Requesting camera permission...</Text>
-      </View>
-    );
-  }
+        <View style={styles.container}>
+            <CameraView
+                style={styles.camera}
+                facing="back"
+                ref={cameraRef}
+                onBarcodeScanned={status === 'scanning' ? onBarcodeScanned : undefined}
+                barcodeScannerSettings={{
+                    barcodeTypes: ['qr'],
+                }}
+            />
 
-  if (!permission.granted) {
-    return (
-      <View style={styles.center}>
-        <Text>No camera permission. Please enable camera in settings.</Text>
-        <Pressable onPress={requestPermission} style={{ marginTop: 12 }}>
-          <Text style={{ color: Colors.terracotta }}>Grant permission</Text>
-        </Pressable>
-        <Pressable onPress={() => navigation.goBack()} style={{ marginTop: 12 }}>
-          <Text style={{ color: Colors.terracotta }}>Go back</Text>
-        </Pressable>
-      </View>
-    );
-  }
+            {error && (
+                <View style={styles.errorBanner}>
+                    <Text style={styles.errorText}>{error}</Text>
+                </View>
+            )}
 
-  return (
-    <View style={styles.container}>
-      <CameraView
-        style={styles.camera}
-        facing="back"
-        ref={cameraRef}
-        onBarcodeScanned={handleBarCodeScanned}
-        barcodeScannerSettings={{
-          barcodeTypes: ['qr'],
-        }}
-      />
-      <View style={styles.overlay}>
-        <View style={styles.scanBox} />
-        <Text style={styles.hint}>Align the QR code on the heritage plaque</Text>
-        <Pressable
-          style={[
-            styles.cancel,
-            {
-              bottom: insets.bottom + 48, // Respect bottom safe area
-            },
-          ]}
-          onPress={() => {
-            setScanned(false);
-            navigation.goBack();
-          }}
-        >
-          <Text style={{ color: '#fff' }}>Cancel</Text>
-        </Pressable>
-      </View>
-    </View>
-  );
+            <View style={styles.overlay}>
+                <Text style={styles.hint}>Align the QR on the plaque</Text>
+                <Pressable style={styles.cancel} onPress={() => navigation.goBack()}>
+                    <Text style={{ color: '#fff', fontSize: 20 }}>Cancel</Text>
+                </Pressable>
+            </View>
+        </View>
+    );
 };
 
 export default QRScanScreen;
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#000' },
-  camera: {
-    flex: 1,
-  },
-  overlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  scanBox: {
-    width: 260,
-    height: 260,
-    borderRadius: 10,
-    borderWidth: 4,
-    borderColor: 'rgba(255,255,255,0.85)',
-    backgroundColor: 'transparent',
-  },
-  hint: {
-    marginTop: 16,
-    color: '#fff',
-    fontWeight: '600',
-  },
-  cancel: {
-    position: 'absolute',
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 10,
-    backgroundColor: Colors.terracotta,
-  },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    container: { flex: 1, backgroundColor: '#000' },
+    camera: { flex: 1 },
+    overlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    frame: { width: 260, height: 260, borderWidth: 4, borderColor: 'rgba(255,255,255,0.9)', borderRadius: 12 },
+    hint: { color: '#fff', marginTop: 500, fontWeight: '900', fontSize: 24 },
+    cancel: { position: 'absolute', bottom: 48, backgroundColor: Colors.terracotta, padding: 12, borderRadius: 10 },
+    center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    errorBanner: {
+        position: 'absolute',
+        top: 50,
+        left: 20,
+        right: 20,
+        backgroundColor: 'rgba(255, 0, 0, 0.8)',
+        padding: 12,
+        borderRadius: 8,
+        alignItems: 'center',
+        zIndex: 10,
+    },
+    errorText: {
+        color: 'white',
+        fontWeight: 'bold',
+    },
 });
