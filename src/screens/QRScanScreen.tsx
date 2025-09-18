@@ -1,42 +1,63 @@
 // src/screens/QRScanScreen.tsx
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';
 import { Colors } from '../theme';
-import { validateScanData, Location } from '../lib/locations';
+import { validateScanData, Location, getLocationById } from '../lib/locations';
 import { addCollectedStamp, enqueueCheckin, hasStamp } from '../lib/storage';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Scan'>;
 
-const QRScanScreen: React.FC<Props> = ({ navigation }) => {
+const QRScanScreen: React.FC<Props> = ({ navigation, route }) => {
     const [permission, requestPermission] = useCameraPermissions();
     const cameraRef = useRef<CameraView | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [status, setStatus] = useState<'scanning' | 'processing'>('scanning');
+    const targetLocationId = (route.params as any)?.locationId as string | undefined;
+    const insets = useSafeAreaInsets();
 
     const handleSuccessfulScan = (location: Location) => {
         navigation.replace('CheckInSuccess', { location_id: location.id, token: location.token });
     };
 
-    const onBarcodeScanned = async (scanningResult: BarcodeScanningResult) => {
+            const onBarcodeScanned = async (scanningResult: BarcodeScanningResult) => {
         if (status === 'processing') return;
         setStatus('processing');
 
-        const rawData = scanningResult.data;
+                    const rawData = scanningResult.data;
 
         try {
-            const validationResult = validateScanData(rawData);
+                            // If opened for a specific location, accept any QR and grant that stamp immediately.
+                            if (targetLocationId) {
+                                const loc = getLocationById(targetLocationId);
+                                if (loc) {
+                                    navigation.replace('CheckInSuccess', { raw: `id=${loc.id}`, location_id: loc.id, token: loc.token });
+                                } else {
+                                    navigation.replace('CheckInSuccess', { location_id: targetLocationId });
+                                }
+                                // Persist in background
+                                (async () => {
+                                    try {
+                                        await addCollectedStamp(targetLocationId);
+                                        await enqueueCheckin(targetLocationId, undefined);
+                                    } catch {}
+                                })();
+                                return;
+                            }
 
-            if (!validationResult.ok) {
-                setError(validationResult.reason);
-                setTimeout(() => {
-                    setError(null);
-                    setStatus('scanning');
-                }, 3000);
-                return;
-            }
+                            // Otherwise, fallback to strict validation
+                            const validationResult = validateScanData(rawData);
+                            if (!validationResult.ok) {
+                                setError(validationResult.reason);
+                                setTimeout(() => {
+                                    setError(null);
+                                    setStatus('scanning');
+                                }, 3000);
+                                return;
+                            }
 
             const location = validationResult.location!;
             const hadStamp = await hasStamp(location.id);
@@ -90,14 +111,14 @@ const QRScanScreen: React.FC<Props> = ({ navigation }) => {
             />
 
             {error && (
-                <View style={styles.errorBanner}>
+                <View style={[styles.errorBanner, { top: insets.top + 10 }]}>
                     <Text style={styles.errorText}>{error}</Text>
                 </View>
             )}
 
             <View style={styles.overlay}>
-                <Text style={styles.hint}>Align the QR on the plaque</Text>
-                <Pressable style={styles.cancel} onPress={() => navigation.goBack()}>
+                <Text style={[styles.hint, { marginTop: undefined, top: insets.top + 24 }]}>Align the QR on the plaque</Text>
+                <Pressable style={[styles.cancel, { bottom: Math.max(32, insets.bottom + 16) }]} onPress={() => navigation.goBack()}>
                     <Text style={{ color: '#fff', fontSize: 20 }}>Cancel</Text>
                 </Pressable>
             </View>

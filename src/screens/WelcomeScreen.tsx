@@ -31,6 +31,11 @@ const WelcomeScreen: React.FC<Props> = ({ navigation }) => {
           }}
           style={{ marginTop: 18, width: '78%' }}
         />
+        <PrimaryButton
+          title="Open Passport"
+          onPress={() => navigation.navigate('Passport')}
+          style={{ marginTop: 12, width: '78%', backgroundColor: '#2E4F9A' }}
+        />
       </View>
 
       {/* Hero background image — uses the hero you uploaded; it's pinned to bottom and spans width */}
