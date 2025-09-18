@@ -26,6 +26,53 @@ A brief description of your project.
 ## Getting Started
 
 Follow these steps to get a local copy of the project up and running on your machine.
+## Server (MongoDB API)
+
+This repo now includes a small API server under `server/` that:
+- Seeds the database with Mysuru places on first start (if empty)
+- Exposes `GET /api/places` to return all places (title, lat, lng, badge, tagCode)
+- Exposes validation endpoints for stamping via QR or Tag:
+  - `POST /api/validate/qr { placeId, qrToken }`
+  - `POST /api/validate/tag { placeId, tagCode }`
+
+Run it locally:
+1. Copy `server/.env.example` to `server/.env` and fill `MONGODB_URI` with your credentials.
+2. Install and start:
+   - Windows PowerShell
+     ```powershell
+     cd 'c:\Users\ajith\RPA\Ambari\server'
+     npm install
+     npm start
+     ```
+3. Test:
+   ```powershell
+   curl http://localhost:4000/api/health
+   curl http://localhost:4000/api/places
+   ```
+
+### MongoDB Schemas (desired)
+
+Place document
+- title: string (required)
+- latitude: number (required)
+- longitude: number (required)
+- badge: string (required) – identifier for the badge/stamp (can also be an asset key or URL)
+- tagCode: string (required) – NFC/tag short code used for validation at the site
+- qrToken: string (required) – the QR token to validate scans
+- description: string (optional)
+
+Checkin document
+- placeId: ObjectId (required) – reference to Place _id
+- tagCode: string (optional)
+- qrToken: string (optional)
+- createdAt: Date (required)
+- userId: string (optional)
+
+### App integration
+
+- Home screen fetches places from `http://localhost:4000/api/places` (Android emulator uses `http://10.0.2.2:4000`).
+- Markers open a popup; tapping a marker in the app navigates to the Scan view.
+- You can extend the flow to call `validate/qr` or `validate/tag` before granting the local stamp.
 
 ### Prerequisites
 

@@ -1,48 +1,78 @@
 // src/screens/HomeScreen.tsx
-import React from 'react';
-import { SafeAreaView, View, Text, StyleSheet, FlatList, ImageBackground, Pressable } from 'react-native';
+import React, { useMemo, useCallback } from 'react';
+import { SafeAreaView, View, Text, StyleSheet, Pressable } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';
-import StampCard from '../components/StampCard';
 import { Colors, Typography, Spacing } from '../theme';
+import { WebView } from 'react-native-webview';
+import { DEFAULT_CENTER, DEFAULT_ZOOM, PLACES } from '../lib/places';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
-const demoData = [
-  { id: 'mysore_palace', title: 'Mysore Palace', collected: false, image: require('../../assets/locations/mysore_palace.png') },
-//   { id: 'jaganmohan', title: 'Jaganmohan Palace', collected: true, image: ('../../assets/locations/jaganmohan.jpg') },
-//   { id: 'lalitha_mahal', title: 'Lalitha Mahal Palace', collected: false, image: ('../../assets/locations/lalitha_mahal.jpg') },
-//   { id: 'chamundi_hill', title: 'Chamundeshwari Temple', collected: false, image: ('../../assets/locations/chamundi_hill.jpg') },
-];
-
 const HomeScreen: React.FC<Props> = ({ navigation }) => {
+  const html = useMemo(() => {
+    const markersJs = PLACES.map(
+      (p) => `
+        (function(){
+          const m = L.marker([${p.lat}, ${p.lng}]).addTo(map).bindPopup(${JSON.stringify(p.name)});
+          m.on('click', function(){
+            if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+              window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'marker', id: ${JSON.stringify(p.id)} }));
+            }
+          });
+        })();
+      `
+    ).join('\n');
+      const latLngs = PLACES.map((p) => `[${p.lat}, ${p.lng}]`).join(',');
+
+    // Inline Leaflet CSS/JS via unpkg CDN suitable for WebView usage
+    return `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <style>
+      html, body, #map { height: 100%; margin: 0; padding: 0; }
+      .leaflet-container { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script>
+      const map = L.map('map').setView([${DEFAULT_CENTER.lat}, ${DEFAULT_CENTER.lng}], ${DEFAULT_ZOOM});
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '© OpenStreetMap contributors'
+      }).addTo(map);
+        ${markersJs}
+        const bounds = L.latLngBounds([${latLngs}]);
+        map.fitBounds(bounds, { padding: [20, 20] });
+    </script>
+  </body>
+ </html>`;
+  }, []);
+
+    const onMessage = useCallback((event: any) => {
+      try {
+        const data = JSON.parse(event?.nativeEvent?.data ?? '{}');
+        if (data?.type === 'marker' && typeof data?.id === 'string') {
+          navigation.navigate('Scan', { locationId: data.id });
+        }
+      } catch {}
+    }, [navigation]);
+
   return (
     <SafeAreaView style={styles.container}>
-      <ImageBackground source={require('../../assets/hero_placeholder.png')} style={styles.heroBg} imageStyle={{ opacity: 0.9 }}>
-        <View style={styles.topRow}>
-          <Text style={styles.heroTitle}>Your Stamp Book</Text>
-          <Pressable onPress={() => navigation.navigate('Profile')} style={styles.profileBtn}>
-            <Text style={{ color: '#fff', fontWeight: '700' }}>Profile</Text>
-          </Pressable>
-        </View>
-
-        <View style={styles.heroMeta}>
-          <Text style={styles.heroSub}>Explore sites and collect unique stamps</Text>
-          {/* <Pressable style={styles.scanButton} onPress={() => navigation.navigate('Scan')}>
-            <Text style={styles.scanText}>Scan QR</Text>
-          </Pressable> */}
-        </View>
-      </ImageBackground>
-
-      <FlatList
-        data={demoData}
-        keyExtractor={(i) => i.id}
-        numColumns={2}
-        contentContainerStyle={styles.listContent}
-        renderItem={({ item }) => (
-          <StampCard id={item.id} title={item.title} collected={item.collected} image={item.image} onPress={() => navigation.navigate('Scan', { locationId : item.id})} />
-        )}
-      />
+      <View style={styles.headerOverlay}>
+        <Text style={styles.headerTitle}>Mysuru Map</Text>
+        <View style={{ flex: 1 }} />
+        <Pressable onPress={() => navigation.navigate('Profile')} style={styles.profileBtn}>
+          <Text style={{ color: '#fff', fontWeight: '700' }}>Profile</Text>
+        </Pressable>
+      </View>
+      <WebView originWhitelist={["*"]} source={{ html }} style={{ flex: 1 }} onMessage={onMessage} />
     </SafeAreaView>
   );
 };
@@ -51,13 +81,18 @@ export default HomeScreen;
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.warmWhite },
-  heroBg: { width: '100%', height: 160, justifyContent: 'center' },
-  topRow: { padding: Spacing.md, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  heroTitle: { fontFamily: Typography.fontFamilyBold, fontSize: 22, color: '#fff' },
+  headerOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    padding: Spacing.md,
+    paddingTop: Spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.overlayDark,
+  },
+  headerTitle: { color: '#fff', fontFamily: Typography.fontFamilyBold, fontSize: 18 },
   profileBtn: { backgroundColor: Colors.gold, padding: 8, borderRadius: 10 },
-  heroMeta: { paddingHorizontal: Spacing.md, paddingBottom: 10 },
-  heroSub: { color: '#fff', marginBottom: 12 },
-  scanButton: { alignSelf: 'flex-start', backgroundColor: Colors.gold, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12 },
-  scanText: { fontFamily: Typography.fontFamilySemi, color: Colors.heritageBrown, fontWeight: '700' },
-  listContent: { padding: Spacing.sm, paddingBottom: 100 },
 });
