@@ -1,17 +1,38 @@
 // src/screens/HomeScreen.tsx
-import React, { useMemo, useCallback } from 'react';
-import { SafeAreaView, View, Text, StyleSheet, Pressable } from 'react-native';
+import React, { useMemo, useCallback, useState } from 'react';
+import { SafeAreaView, View, Text, StyleSheet, Pressable, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../App';
+import { RootStackParamList } from '../navigation/types';
 import { Colors, Typography, Spacing } from '../theme';
 import { WebView } from 'react-native-webview';
 import { DEFAULT_CENTER, DEFAULT_ZOOM, PLACES } from '../lib/places';
+import { getLocationById, Location } from '../lib/locations';
+import { generateQuizQuestions } from '../lib/geminiApi';
+import { QuizQuestion, QuizResult } from '../lib/quiz';
+import { saveQuizResult } from '../lib/scoreManager';
+import { calculateDiscount, calculatePoints } from '../lib/quiz';
+import PlaceInfoCard from '../components/PlaceInfoCard';
+import QuizModal from '../components/QuizModal';
+import QuizResultsModal from '../components/QuizResultsModal';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
 const HomeScreen: React.FC<Props> = ({ navigation }) => {
+  // State for quiz flow from the 'Karthik' branch
+  const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null);
+  const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
+  const [showPlaceInfoCard, setShowPlaceInfoCard] = useState(false);
+  const [showQuizModal, setShowQuizModal] = useState(false);
+  const [showResultsModal, setShowResultsModal] = useState(false);
+  const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([]);
+  const [quizResults, setQuizResults] = useState<{ correct: number; total: number }>({ correct: 0, total: 0 });
+  const [isLoadingQuiz, setIsLoadingQuiz] = useState(false);
+  const [quizError, setQuizError] = useState<string | null>(null);
+  
+  // Hook from the 'main' branch
   const insets = useSafeAreaInsets();
+
   const html = useMemo(() => {
     const markersJs = PLACES.map(
       (p) => `
@@ -70,8 +91,8 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
     <script>
       const map = L.map('map', { preferCanvas: true, zoomControl: true }).setView([${DEFAULT_CENTER.lat}, ${
-      DEFAULT_CENTER.lng
-    }], ${DEFAULT_ZOOM});
+        DEFAULT_CENTER.lng
+      }], ${DEFAULT_ZOOM});
       // Carto light basemap (clean, readable)
       L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
         subdomains: 'abcd',
@@ -114,17 +135,91 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
       map.fitBounds(bounds, { padding: [32, 32] });
     </script>
   </body>
- </html>`;
+</html>`;
   }, []);
 
-    const onMessage = useCallback((event: any) => {
-      try {
-        const data = JSON.parse(event?.nativeEvent?.data ?? '{}');
-        if (data?.type === 'marker' && typeof data?.id === 'string') {
-          navigation.navigate('GetStamp', { locationId: data.id });
+  const onMessage = useCallback((event: any) => {
+    try {
+      const data = JSON.parse(event?.nativeEvent?.data ?? '{}');
+      if (data?.type === 'marker' && typeof data?.id === 'string') {
+        // Combined logic: show quiz pop-up for locations with facts, otherwise navigate to the scan screen.
+        const location = getLocationById(data.id);
+        if (location) {
+          if (location.facts || location.id === 'mysore_palace') {
+            setSelectedLocationId(data.id);
+            setSelectedLocation(location);
+            setShowPlaceInfoCard(true);
+          } else {
+            // Fallback to scan screen
+            navigation.navigate('Scan', { locationId: data.id });
+          }
         }
-      } catch {}
-    }, [navigation]);
+      }
+    } catch (error) {
+      console.error('Error parsing message from WebView:', error);
+    }
+  }, [navigation]);
+
+  // Start quiz flow
+  const handleStartQuiz = useCallback(async () => {
+    if (!selectedLocationId || !selectedLocation) return;
+    
+    setShowPlaceInfoCard(false);
+    setIsLoadingQuiz(true);
+    setShowQuizModal(true);
+    setQuizError(null);
+    
+    try {
+      // Generate quiz questions
+      const questions = await generateQuizQuestions(selectedLocationId);
+      setQuizQuestions(questions);
+    } catch (error) {
+      console.error('Error generating quiz:', error);
+      setQuizError('Failed to generate quiz questions. Please try again.');
+    } finally {
+      setIsLoadingQuiz(false);
+    }
+  }, [selectedLocationId, selectedLocation]);
+
+  // Handle quiz completion
+  const handleQuizComplete = useCallback((correctAnswers: number, totalQuestions: number) => {
+    setQuizResults({ correct: correctAnswers, total: totalQuestions });
+    setShowQuizModal(false);
+    setShowResultsModal(true);
+    
+    // Calculate points and save quiz result
+    const points = calculatePoints(correctAnswers);
+    const discount = calculateDiscount(correctAnswers, totalQuestions);
+    
+    if (selectedLocationId) {
+      const result: QuizResult = {
+        locationId: selectedLocationId,
+        totalQuestions,
+        correctAnswers,
+        pointsEarned: points,
+        discountPercentage: discount,
+        timestamp: Date.now()
+      };
+      
+      // Save the result
+      saveQuizResult(result);
+    }
+  }, [selectedLocationId]);
+
+  // Handle continuing after seeing results
+  const handleContinue = useCallback(() => {
+    setShowResultsModal(false);
+    setSelectedLocationId(null);
+    setSelectedLocation(null);
+    setQuizQuestions([]);
+  }, []);
+
+  // Retry quiz generation if there was an error
+  const handleRetryQuizGeneration = useCallback(() => {
+    if (selectedLocationId) {
+      handleStartQuiz();
+    }
+  }, [selectedLocationId, handleStartQuiz]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -139,6 +234,53 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         </Pressable>
       </View>
       <WebView originWhitelist={["*"]} source={{ html }} style={{ flex: 1 }} onMessage={onMessage} />
+
+      {/* Place Info Card Modal */}
+      <Modal
+        visible={showPlaceInfoCard}
+        transparent
+        animationType="fade"
+      >
+        <View style={styles.modalOverlay}>
+          {selectedLocation && (
+            <PlaceInfoCard
+              location={selectedLocation}
+              onClose={() => setShowPlaceInfoCard(false)}
+              onStartQuiz={handleStartQuiz}
+            />
+          )}
+        </View>
+      </Modal>
+
+      {/* Quiz Modal */}
+      {selectedLocation && (
+        <QuizModal
+          visible={showQuizModal}
+          locationId={selectedLocationId || ''}
+          locationName={selectedLocation.name}
+          questions={quizQuestions}
+          onClose={() => {
+            setShowQuizModal(false);
+            setQuizQuestions([]);
+          }}
+          onComplete={handleQuizComplete}
+          isLoading={isLoadingQuiz}
+          error={quizError || undefined}
+          onRetry={handleRetryQuizGeneration}
+        />
+      )}
+
+      {/* Quiz Results Modal */}
+      {selectedLocation && (
+        <QuizResultsModal
+          visible={showResultsModal}
+          locationName={selectedLocation.name}
+          correctAnswers={quizResults.correct}
+          totalQuestions={quizResults.total}
+          onClose={() => setShowResultsModal(false)}
+          onContinue={handleContinue}
+        />
+      )}
     </SafeAreaView>
   );
 };
@@ -167,4 +309,10 @@ const styles = StyleSheet.create({
   },
   headerTitle: { color: '#fff', fontFamily: Typography.fontFamilyBold, fontSize: 18 },
   profileBtn: { backgroundColor: Colors.gold, padding: 8, borderRadius: 10 },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 });

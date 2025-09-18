@@ -15,17 +15,10 @@ import QRScanScreen from './src/screens/QRScanScreen';
 import CheckInSuccessScreen from './src/screens/CheckInSuccessScreen';
 import PassportScreen from './src/screens/PassportScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
+import QuizHomeScreen from './src/screens/QuizHomeScreen';
 
-// Root stack param list updated to allow raw param
-export type RootStackParamList = {
-  Welcome: undefined;
-  Home: undefined;
-  GetStamp: { locationId: string };
-  Scan: { locationId: string };
-  CheckInSuccess: { raw?: string; location_id?: string; token?: string } | undefined;
-  Passport: { justStamped?: boolean; stampedLocationId?: string } | undefined;
-  Profile: undefined;
-};
+// Import RootStackParamList from navigation types
+import { RootStackParamList } from './src/navigation/types';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -51,6 +44,7 @@ export default function App() {
           <Stack.Screen name="CheckInSuccess" component={CheckInSuccessScreen} />
           <Stack.Screen name="Passport" component={PassportScreen} />
           <Stack.Screen name="Profile" component={ProfileScreen} />
+          <Stack.Screen name="Quiz" component={QuizHomeScreen} />
         </Stack.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>
