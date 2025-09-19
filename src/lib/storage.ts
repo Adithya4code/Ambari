@@ -38,6 +38,14 @@ export async function hasStamp(locationId: string): Promise<boolean> {
   return stamps.includes(locationId);
 }
 
+export async function clearCollectedStamps(): Promise<void> {
+  try {
+    await AsyncStorage.setItem(STAMPS_KEY, JSON.stringify([]));
+  } catch (err) {
+    console.warn('clearCollectedStamps err', err);
+  }
+}
+
 export async function getQueue(): Promise<QueuedCheckin[]> {
   try {
     const raw = await AsyncStorage.getItem(QUEUE_KEY);
@@ -68,6 +76,14 @@ export async function updateQueueItemStatus(id: string, status: 'queued' | 'sync
   if (idx >= 0) {
     queue[idx].status = status;
     await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
+  }
+}
+
+export async function clearQueue(): Promise<void> {
+  try {
+    await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify([]));
+  } catch (err) {
+    console.warn('clearQueue err', err);
   }
 }
 

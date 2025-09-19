@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, SafeAreaView, StyleSheet, Pressable, Animated } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../App';
+import { RootStackParamList } from '../navigation/types';
 import { validateScanData, Location } from '../lib/locations';
 import { addCollectedStamp, enqueueCheckin, hasStamp } from '../lib/storage';
 import LocationDetail from '../components/LocationDetail';
@@ -80,12 +80,30 @@ const CheckInSuccessScreen: React.FC<Props> = ({ route, navigation }) => {
     })();
   }, [raw]);
 
-  // Handle the initial 'validating' state.
-  if (status === 'validating' || !location) {
+  if (status === 'validating' || (!location && status !== 'error')) {
     return (
       <SafeAreaView style={styles.container}>
         <Text style={styles.title}>Processing check-in…</Text>
         <Text style={styles.sub}>Validating scanned token and saving your stamp.</Text>
+      </SafeAreaView>
+    );
+  }
+
+  if (status === 'error') {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Validation Failed</Text>
+          <Text style={styles.sub}>We could not validate that QR. Please try rescanning.</Text>
+        </View>
+        <View style={styles.footer}>
+          <Pressable style={styles.button} onPress={() => navigation.replace('Scan', { locationId: location_id })}>
+            <Text style={styles.buttonText}>Rescan</Text>
+          </Pressable>
+          <Pressable style={[styles.button, styles.ghost]} onPress={() => navigation.replace('Home')}>
+            <Text style={[styles.buttonText, { color: Colors.heritageBrown }]}>Back to Map</Text>
+          </Pressable>
+        </View>
       </SafeAreaView>
     );
   }
@@ -98,10 +116,10 @@ const CheckInSuccessScreen: React.FC<Props> = ({ route, navigation }) => {
         <Text style={styles.small}>{alreadyHad ? 'You already had this stamp — updated timestamp recorded.' : 'New stamp added to your collection!'}</Text>
       </View>
       <View style={{ flex: 1 }}>
-        <LocationDetail location={location} autoPlay />
+        <LocationDetail location={location!} autoPlay />
         {/* Overlay the actual transparent stamp for this place */}
         {(() => {
-          const s = getStamp(location.id);
+          const s = getStamp(location!.id);
           if (!s) return null;
           return (
             <View style={styles.stampOverlayWrap} pointerEvents="none">

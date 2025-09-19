@@ -1,8 +1,8 @@
 // src/screens/WelcomeScreen.tsx
 import React from 'react';
-import { SafeAreaView, View, Text, StyleSheet, Image } from 'react-native';
+import { SafeAreaView, View, Text, StyleSheet, ImageBackground } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../App';
+import { RootStackParamList } from '../navigation/types';
 import Logo from '../components/Logo';
 import PrimaryButton from '../components/PrimaryButton';
 import { Colors, Typography } from '../theme';
@@ -11,35 +11,39 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Welcome'>;
 
 const WelcomeScreen: React.FC<Props> = ({ navigation }) => {
   return (
-    // SafeAreaView is handled by SafeAreaProvider at top-level; we can still use full-screen container here
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Logo size={110} />
-        {/* App title */}
-        <Text style={styles.title}>Mysuru Explorer</Text>
-      </View>
+      {/* Hero as fullscreen background */}
+      <ImageBackground
+        source={require('../../assets/hero_placeholder.png')}
+        style={styles.hero}
+        resizeMode="cover"
+      >
+        {/* Dark overlay to make text more readable */}
+        <View style={styles.darkOverlay} />
 
-      <View style={styles.body}>
-        <Text style={styles.lead}>
-          Discover Mysuru’s rich heritage. Scan QR plaques at real locations, collect beautifully designed stamps, and enjoy short cultural videos — all available offline.
-        </Text>
+        {/* Content overlay */}
+        <View style={styles.overlay}>
+          {/* Header with logo + title */}
+          <View style={styles.header}>
+            <Logo size={110} />
+            <Text style={styles.title}>Ambari</Text>
+          </View>
 
-        <PrimaryButton
-          title="Get Started"
-          onPress={() => {
-            navigation.replace('Home'); // demo flow
-          }}
-          style={{ marginTop: 18, width: '78%' }}
-        />
-        <PrimaryButton
-          title="Open Passport"
-          onPress={() => navigation.navigate('Passport')}
-          style={{ marginTop: 12, width: '78%', backgroundColor: '#2E4F9A' }}
-        />
-      </View>
+          {/* Body content */}
+          <View style={styles.body}>
+            <Text style={styles.lead}>
+              Discover Mysuru’s rich heritage. Scan QR plaques at real locations, collect beautifully designed stamps, and enjoy short cultural videos — all available offline.
+            </Text>
+          </View>
 
-      {/* Hero background image — uses the hero you uploaded; it's pinned to bottom and spans width */}
-      <Image source={require('../../assets/hero_placeholder.png')} style={styles.hero} resizeMode="cover" />
+          {/* Button at bottom */}
+          <PrimaryButton
+            title="Get Started"
+            onPress={() => navigation.replace('Home')}
+            style={styles.button}
+          />
+        </View>
+      </ImageBackground>
     </SafeAreaView>
   );
 };
@@ -49,35 +53,51 @@ export default WelcomeScreen;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.warmWhite, // subtle warm background to match heritage palette
+    backgroundColor: Colors.warmWhite,
+  },
+  hero: {
+    flex: 1, // hero covers full screen
+    width: '100%',
+    height: '100%',
+    justifyContent: 'flex-end', // children anchored to bottom
+  },
+  darkOverlay: {
+    ...StyleSheet.absoluteFillObject, // covers entire image
+    backgroundColor: 'rgba(0,0,0,0.35)', // adjust 0.25–0.5 for more/less darkness
+  },
+  overlay: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingVertical: 40,
+    paddingHorizontal: 28,
   },
   header: {
     alignItems: 'center',
-    marginTop: 18,
+    marginTop: 10, // moved higher (was 60)
   },
   title: {
     marginTop: 8,
-    fontSize: 26,
+    fontSize: 30,
     fontFamily: Typography.fontFamilyBold,
-    color: Colors.heritageBrown,
+    color: '#FFD700', // golden color for regal vibe
+    textShadowColor: 'rgba(0,0,0,0.6)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
   },
   body: {
-    paddingHorizontal: 28,
     alignItems: 'center',
+    marginHorizontal: 20,
   },
   lead: {
     textAlign: 'center',
-    fontSize: 15,
-    color: Colors.mutedText,
+    fontSize: 16,
+    color: '#fff', // white text for readability
     fontFamily: Typography.fontFamily,
     lineHeight: 22,
   },
-  hero: {
-    width: '100%',
-    height: 260,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+  button: {
+    alignSelf: 'center',
+    width: '80%',
   },
 });

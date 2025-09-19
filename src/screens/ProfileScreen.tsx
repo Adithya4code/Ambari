@@ -1,8 +1,8 @@
 // src/screens/ProfileScreen.tsx
 import React, { useEffect, useState } from 'react';
-import { SafeAreaView, View, Text, StyleSheet, FlatList, Pressable } from 'react-native';
+import { SafeAreaView, View, Text, StyleSheet, FlatList, Pressable, Alert } from 'react-native';
 import { Colors, Typography, Spacing } from '../theme';
-import { getCollectedStamps, getQueue, processQueue } from '../lib/storage';
+import { getCollectedStamps, getQueue, processQueue, clearCollectedStamps, clearQueue } from '../lib/storage';
 import { getLocationById, LOCATIONS } from '../lib/locations';
 import StampCard from '../components/StampCard';
 
@@ -36,6 +36,22 @@ const ProfileScreen: React.FC = () => {
     alert(`Sync complete — ${res.success} success, ${res.failed} failed`);
   };
 
+  const onReset = async () => {
+    Alert.alert('Reset All Stamps', 'This will remove all collected stamps and clear pending check-ins. This cannot be undone. Continue?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Reset', style: 'destructive', onPress: async () => {
+          await clearCollectedStamps();
+          await clearQueue();
+          const s = await getCollectedStamps();
+          setCollected(s);
+          const q = await getQueue();
+          setQueueItems(q);
+        }
+      }
+    ]);
+  };
+
   const stamps = collected.map((id) => getLocationById(id)).filter(Boolean);
 
   return (
@@ -45,6 +61,9 @@ const ProfileScreen: React.FC = () => {
         <Text style={styles.sub}>Stamps collected: {stamps.length} / {LOCATIONS.length}</Text>
         <Pressable style={styles.sync} onPress={onSync}>
           <Text style={{ color: '#fff', fontWeight: '700' }}>{syncing ? 'Syncing...' : 'Sync'}</Text>
+        </Pressable>
+        <Pressable style={[styles.sync, { backgroundColor: Colors.gold }]} onPress={onReset}>
+          <Text style={{ color: '#000', fontWeight: '700' }}>Reset Stamps</Text>
         </Pressable>
       </View>
 

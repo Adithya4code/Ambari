@@ -247,6 +247,12 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
               location={selectedLocation}
               onClose={() => setShowPlaceInfoCard(false)}
               onStartQuiz={handleStartQuiz}
+              onScan={() => {
+                setShowPlaceInfoCard(false);
+                if (selectedLocationId) {
+                  navigation.navigate('Scan', { locationId: selectedLocationId });
+                }
+              }}
             />
           )}
         </View>

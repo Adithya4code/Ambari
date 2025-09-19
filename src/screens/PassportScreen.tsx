@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { SafeAreaView, View, Text, StyleSheet, FlatList, Image, Animated, Dimensions, Pressable } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../App';
+import { RootStackParamList } from '../navigation/types';
 import { Colors, Typography, Spacing } from '../theme';
 import { getCollectedStamps } from '../lib/storage';
 import { PLACES } from '../lib/places';

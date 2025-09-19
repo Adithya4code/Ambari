@@ -4,7 +4,7 @@ import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions, BarcodeScanningResult } from 'expo-camera';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../App';
+import { RootStackParamList } from '../navigation/types';
 import { Colors } from '../theme';
 import { validateScanData, Location, getLocationById } from '../lib/locations';
 import { addCollectedStamp, enqueueCheckin, hasStamp } from '../lib/storage';
@@ -23,41 +23,43 @@ const QRScanScreen: React.FC<Props> = ({ navigation, route }) => {
         navigation.replace('CheckInSuccess', { location_id: location.id, token: location.token });
     };
 
-            const onBarcodeScanned = async (scanningResult: BarcodeScanningResult) => {
+    const onBarcodeScanned = async (scanningResult: BarcodeScanningResult) => {
         if (status === 'processing') return;
         setStatus('processing');
 
-                    const rawData = scanningResult.data;
+        const rawData = scanningResult.data;
 
         try {
-                            // If opened for a specific location, accept any QR and grant that stamp immediately.
-                            if (targetLocationId) {
-                                const loc = getLocationById(targetLocationId);
-                                if (loc) {
-                                    navigation.replace('CheckInSuccess', { raw: `id=${loc.id}`, location_id: loc.id, token: loc.token });
-                                } else {
-                                    navigation.replace('CheckInSuccess', { location_id: targetLocationId });
-                                }
-                                // Persist in background
-                                (async () => {
-                                    try {
-                                        await addCollectedStamp(targetLocationId);
-                                        await enqueueCheckin(targetLocationId, undefined);
-                                    } catch {}
-                                })();
-                                return;
-                            }
+            // If opened for a specific location, accept any QR and grant that stamp immediately.
+            if (targetLocationId) {
+                const loc = getLocationById(targetLocationId);
+                if (loc) {
+                    // Provide a properly formatted URL string so validateScanData succeeds
+                    const rawUrl = `https://mysuru.example/checkin?location_id=${loc.id}&token=${loc.token}`;
+                    navigation.replace('CheckInSuccess', { raw: rawUrl, location_id: loc.id, token: loc.token });
+                } else {
+                    navigation.replace('CheckInSuccess', { location_id: targetLocationId });
+                }
+                // Persist in background
+                (async () => {
+                    try {
+                        await addCollectedStamp(targetLocationId);
+                        await enqueueCheckin(targetLocationId, undefined);
+                    } catch {}
+                })();
+                return;
+            }
 
-                            // Otherwise, fallback to strict validation
-                            const validationResult = validateScanData(rawData);
-                            if (!validationResult.ok) {
-                                setError(validationResult.reason);
-                                setTimeout(() => {
-                                    setError(null);
-                                    setStatus('scanning');
-                                }, 3000);
-                                return;
-                            }
+            // Otherwise, fallback to strict validation
+            const validationResult = validateScanData(rawData);
+            if (!validationResult.ok) {
+                setError(validationResult.reason);
+                setTimeout(() => {
+                    setError(null);
+                    setStatus('scanning');
+                }, 3000);
+                return;
+            }
 
             const location = validationResult.location!;
             const hadStamp = await hasStamp(location.id);

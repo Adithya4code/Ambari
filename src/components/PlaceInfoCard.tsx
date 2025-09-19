@@ -10,33 +10,16 @@ interface PlaceInfoCardProps {
   location: Location;
   onClose: () => void;
   onStartQuiz: () => void;
+  onScan: () => void; // new prop for QR scan action
 }
 
 const PlaceInfoCard: React.FC<PlaceInfoCardProps> = ({ 
   location, 
   onClose,
-  onStartQuiz
+  onStartQuiz,
+  onScan
 }) => {
-  // If location has no facts, show a message
-  if (!location.facts) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.title}>{location.name}</Text>
-          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-            <Text style={styles.closeButtonText}>✕</Text>
-          </TouchableOpacity>
-        </View>
-        <Text style={styles.noFactsText}>
-          Information about this place is not available at the moment.
-        </Text>
-        <TouchableOpacity onPress={onClose} style={styles.closeCardButton}>
-          <Text style={styles.buttonText}>Close</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
+  const hasFacts = !!location.facts;
   const { facts } = location;
 
   return (
@@ -49,44 +32,58 @@ const PlaceInfoCard: React.FC<PlaceInfoCardProps> = ({
       </View>
 
       <ScrollView style={styles.factsContainer}>
-        <View style={styles.factRow}>
-          <Text style={styles.factLabel}>Main Feature</Text>
-          <Text style={styles.factText}>{facts.mainFeature}</Text>
-        </View>
-        
-        <View style={styles.factRow}>
-          <Text style={styles.factLabel}>Origin of Name</Text>
-          <Text style={styles.factText}>{facts.originOfName}</Text>
-        </View>
-        
-        <View style={styles.factRow}>
-          <Text style={styles.factLabel}>History</Text>
-          <Text style={styles.factText}>{facts.history}</Text>
-        </View>
-        
-        <View style={styles.factRow}>
-          <Text style={styles.factLabel}>Specialty</Text>
-          <Text style={styles.factText}>{facts.specialty}</Text>
-        </View>
-        
-        <View style={styles.factRow}>
-          <Text style={styles.factLabel}>Famous For</Text>
-          <Text style={styles.factText}>{facts.famousFact}</Text>
-        </View>
-        
-        <View style={styles.factRow}>
-          <Text style={styles.factLabel}>Cultural Significance</Text>
-          <Text style={styles.factText}>{facts.culturalSignificance}</Text>
-        </View>
+        {hasFacts ? (
+          <>
+            <View style={styles.factRow}>
+              <Text style={styles.factLabel}>Main Feature</Text>
+              <Text style={styles.factText}>{facts?.mainFeature}</Text>
+            </View>
+            <View style={styles.factRow}>
+              <Text style={styles.factLabel}>Origin of Name</Text>
+              <Text style={styles.factText}>{facts?.originOfName}</Text>
+            </View>
+            <View style={styles.factRow}>
+              <Text style={styles.factLabel}>History</Text>
+              <Text style={styles.factText}>{facts?.history}</Text>
+            </View>
+            <View style={styles.factRow}>
+              <Text style={styles.factLabel}>Specialty</Text>
+              <Text style={styles.factText}>{facts?.specialty}</Text>
+            </View>
+            <View style={styles.factRow}>
+              <Text style={styles.factLabel}>Famous For</Text>
+              <Text style={styles.factText}>{facts?.famousFact}</Text>
+            </View>
+            <View style={styles.factRow}>
+              <Text style={styles.factLabel}>Cultural Significance</Text>
+              <Text style={styles.factText}>{facts?.culturalSignificance}</Text>
+            </View>
+          </>
+        ) : (
+          <Text style={styles.noFactsText}>
+            Information about this place is not available right now. You can still scan the QR code on-site.
+          </Text>
+        )}
       </ScrollView>
 
       <View style={styles.footer}>
-        <Text style={styles.quizPrompt}>
-          Test your knowledge about {location.name} with a quiz!
-        </Text>
-        <TouchableOpacity onPress={onStartQuiz} style={styles.startQuizButton}>
-          <Text style={styles.buttonText}>Start Quiz</Text>
-        </TouchableOpacity>
+        {hasFacts && (
+          <Text style={styles.quizPrompt}>
+            Test your knowledge about {location.name} with a quiz!
+          </Text>
+        )}
+        <View style={styles.actionsRow}>
+          <TouchableOpacity
+            onPress={onStartQuiz}
+            disabled={!hasFacts}
+            style={[styles.startQuizButton, !hasFacts && styles.disabledBtn]}
+          >
+            <Text style={styles.buttonText}>{hasFacts ? 'Start Quiz' : 'Quiz Unavailable'}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={onScan} style={styles.scanButton}>
+            <Text style={styles.buttonText}>Scan QR</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
@@ -155,12 +152,12 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.md,
     alignItems: 'center',
   },
-  quizPrompt: {
-    fontFamily: Typography.fontFamilySemi,
-    fontSize: 14,
-    color: Colors.mutedText,
-    marginBottom: Spacing.sm,
-    textAlign: 'center',
+  actionsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: Spacing.sm,
   },
   startQuizButton: {
     backgroundColor: Colors.royalBlue,
@@ -168,7 +165,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     borderRadius: 30,
     alignItems: 'center',
-    marginTop: Spacing.sm,
+    minWidth: 140,
+  },
+  scanButton: {
+    backgroundColor: Colors.gold,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
+    borderRadius: 30,
+    alignItems: 'center',
+    minWidth: 140,
+  },
+  disabledBtn: {
+    backgroundColor: '#9aa4b1',
+  },
+  quizPrompt: {
+    fontFamily: Typography.fontFamilySemi,
+    fontSize: 14,
+    color: Colors.mutedText,
+    marginBottom: Spacing.sm,
+    textAlign: 'center',
   },
   buttonText: {
     color: 'white',

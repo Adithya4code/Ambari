@@ -2,7 +2,7 @@
 import React from 'react';
 import { SafeAreaView, View, Text, StyleSheet, Image } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../App';
+import { RootStackParamList } from '../navigation/types';
 import { Colors, Typography, Spacing } from '../theme';
 import SwipeToConfirm from '../components/SwipeToConfirm';
 import { PLACES } from '../lib/places';
